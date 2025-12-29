@@ -38,3 +38,63 @@ resource "aws_subnet" "primary_private" {
     Name = "dev-va-private-${var.va_azs[count.index]}"
   }
 }
+
+resource "aws_eip" "primary_eip" {
+  count  = length(var.va_public_subnets)
+  domain = "vpc"
+
+  tags = {
+    Name = "dev-va-nat-eip-${var.va_azs[count.index]}"
+  }
+}
+
+resource "aws_nat_gateway" "primary_nat" {
+  count         = length(var.va_public_subnets)
+  allocation_id = aws_eip.primary_eip[count.index].id
+  subnet_id     = aws_subnet.primary_public[count.index].id
+
+  tags = {
+    Name = "dev-va-nat-${var.va_azs[count.index]}"
+  }
+
+  depends_on = [aws_internet_gateway.primary_igw]
+}
+
+resource "aws_route_table" "primary_public_rt" {
+  vpc_id = aws_vpc.primary.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.primary_igw.id
+  }
+
+  tags = {
+    Name = "dev-va-pub-rt"
+  }
+}
+
+resource "aws_route_table_association" "primary_public_rta" {
+  count          = length(var.va_public_subnets)
+  subnet_id      = aws_subnet.primary_public[count.index].id
+  route_table_id = aws_route_table.primary_public_rt.id
+}
+
+resource "aws_route_table" "primary_private_rt" {
+  count  = length(var.va_private_subnets)
+  vpc_id = aws_vpc.primary.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_nat_gateway.primary_nat[count.index].id
+  }
+
+  tags = {
+    Name = "dev-va-priv-rt-${var.va_azs[count.index]}"
+  }
+}
+
+resource "aws_route_table_association" "primary_private_rta" {
+  count          = length(var.va_private_subnets)
+  subnet_id      = aws_subnet.primary_private[count.index].id
+  route_table_id = aws_route_table.primary_private_rt[count.index].id
+}
