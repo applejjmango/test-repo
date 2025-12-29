@@ -98,3 +98,51 @@ resource "aws_route_table_association" "primary_private_rta" {
   subnet_id      = aws_subnet.primary_private[count.index].id
   route_table_id = aws_route_table.primary_private_rt[count.index].id
 }
+
+# -----------------------------------------------------------------------------
+# 2. Seoul Network (Secondary)
+# -----------------------------------------------------------------------------
+resource "aws_vpc" "secondary" {
+  provider             = aws.seoul
+  cidr_block           = var.seoul_vpc_cidr
+  enable_dns_hostnames = true
+  enable_dns_support   = true
+
+  tags = {
+    Name = "dev-seoul-vpc"
+  }
+}
+
+resource "aws_internet_gateway" "secondary_igw" {
+  provider = aws.seoul
+  vpc_id   = aws_vpc.secondary.id
+
+  tags = {
+    Name = "dev-seoul-igw"
+  }
+}
+
+resource "aws_subnet" "secondary_public" {
+  provider                = aws.seoul
+  count                   = length(var.seoul_public_subnets)
+  vpc_id                  = aws_vpc.secondary.id
+  cidr_block              = var.seoul_public_subnets[count.index]
+  availability_zone       = var.seoul_azs[count.index]
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name = "dev-seoul-pub-${var.seoul_azs[count.index]}"
+  }
+}
+
+resource "aws_subnet" "secondary_private" {
+  provider          = aws.seoul
+  count             = length(var.seoul_private_subnets)
+  vpc_id            = aws_vpc.secondary.id
+  cidr_block        = var.seoul_private_subnets[count.index]
+  availability_zone = var.seoul_azs[count.index]
+
+  tags = {
+    Name = "dev-seoul-priv-${var.seoul_azs[count.index]}"
+  }
+}
