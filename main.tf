@@ -146,3 +146,69 @@ resource "aws_subnet" "secondary_private" {
     Name = "dev-seoul-priv-${var.seoul_azs[count.index]}"
   }
 }
+
+resource "aws_eip" "seoul_nat_eip" {
+  provider = aws.seoul
+  count    = length(var.seoul_public_subnets)
+  domain   = "vpc"
+
+  tags = {
+    Name = "dev-seoul-nat-eip-${var.seoul_azs[count.index]}"
+  }
+}
+
+resource "aws_nat_gateway" "seoul_nat" {
+  provider      = aws.seoul
+  count         = length(var.seoul_public_subnets)
+  allocation_id = aws_eip.seoul_nat_eip[count.index].id
+  subnet_id     = aws_subnet.secondary_public[count.index].id
+
+  tags = {
+    Name = "dev-seoul-nat-${var.seoul_azs[count.index]}"
+  }
+
+  depends_on = [aws_internet_gateway.secondary_igw]
+}
+
+resource "aws_route_table" "secondary_public_rt" {
+  provider = aws.seoul
+  vpc_id   = aws_vpc.secondary.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.secondary_igw.id
+  }
+
+  tags = {
+    Name = "dev-seoul-pub-rt"
+  }
+}
+
+resource "aws_route_table_association" "secondary_pub_assoc" {
+  provider       = aws.seoul
+  count          = length(var.seoul_public_subnets)
+  subnet_id      = aws_subnet.secondary_public[count.index].id
+  route_table_id = aws_route_table.secondary_public_rt.id
+}
+
+resource "aws_route_table" "secondary_private_rt" {
+  provider = aws.seoul
+  count    = length(var.seoul_private_subnets)
+  vpc_id   = aws_vpc.secondary.id
+
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.seoul_nat[count.index].id
+  }
+
+  tags = {
+    Name = "dev-seoul-priv-rt-${var.seoul_azs[count.index]}"
+  }
+}
+
+resource "aws_route_table_association" "secondary_priv_assoc" {
+  provider       = aws.seoul
+  count          = length(var.seoul_private_subnets)
+  subnet_id      = aws_subnet.secondary_private[count.index].id
+  route_table_id = aws_route_table.secondary_private_rt[count.index].id
+}
