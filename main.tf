@@ -212,3 +212,26 @@ resource "aws_route_table_association" "secondary_priv_assoc" {
   subnet_id      = aws_subnet.secondary_private[count.index].id
   route_table_id = aws_route_table.secondary_private_rt[count.index].id
 }
+
+# VPC PEERING
+resource "aws_vpc_peering_connection" "peer" {
+  vpc_id        = aws_vpc.primary.id
+  peer_vpc_id   = aws_vpc.secondary.id
+  auto_accept   = false
+  peer_region   = "ap-northeast-2"
+
+  tags = {
+    Name = "dev-va-to-seoul-peer"
+  }
+}
+
+# Accepter's side of the connection.
+resource "aws_vpc_peering_connection_accepter" "peer" {
+  provider                  = aws.seoul
+  vpc_peering_connection_id = aws_vpc_peering_connection.peer.id
+  auto_accept               = true
+
+  tags = {
+    Name = "dev-seoul-peer-accepter"
+  }
+}
