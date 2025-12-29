@@ -235,3 +235,22 @@ resource "aws_vpc_peering_connection_accepter" "peer" {
     Name = "dev-seoul-peer-accepter"
   }
 }
+
+resource "aws_route" "va_to_seoul" {
+  count                     = length(var.va_private_subnets)
+  route_table_id            = aws_route_table.primary_private_rt[count.index].id
+  destination_cidr_block    = var.seoul_vpc_cidr
+  vpc_peering_connection_id = aws_vpc_peering_connection.peer.id
+
+  depends_on = [aws_vpc_peering_connection_accepter.peer]
+}
+
+resource "aws_route" "seoul_to_va" {
+  provider                  = aws.seoul
+  count                     = length(var.seoul_private_subnets)
+  route_table_id            = aws_route_table.secondary_private_rt[count.index].id
+  destination_cidr_block    = var.va_vpc_cidr
+  vpc_peering_connection_id = aws_vpc_peering_connection.peer.id
+
+  depends_on = [aws_vpc_peering_connection_accepter.peer]
+}
